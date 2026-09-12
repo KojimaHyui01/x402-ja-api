@@ -45,6 +45,14 @@ describe("discovery documents", () => {
     expect(op.requestBody.content["application/json"].schema.required).toEqual(["address"]);
   });
 
+  it("publishes a contact email and serves a favicon", async () => {
+    const o = await request(app).get("/openapi.json");
+    expect(o.body.info.contact.email).toBe("yux0115@gmail.com");
+    const f = await request(app).get("/favicon.ico");
+    expect(f.status).toBe(200);
+    expect(f.headers["content-type"]).toMatch(/image\/x-icon/);
+  });
+
   it("serves /.well-known/x402 with absolute resource URLs", async () => {
     const r = await request(app).get("/.well-known/x402");
     expect(r.status).toBe(200);

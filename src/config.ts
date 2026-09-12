@@ -13,6 +13,8 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4021),
   PUBLIC_BASE_URL: z.string().url().default("http://localhost:4021"),
   SERVICE_NAME: z.string().min(1).default("ja-normalize"),
+  /** Published in openapi.json (info.contact.email) for registry ownership checks and support. */
+  CONTACT_EMAIL: z.string().email().default("yux0115@gmail.com"),
   PAY_TO_ADDRESS: z
     .string()
     .regex(/^0x[0-9a-fA-F]{40}$/, "must be a 0x-prefixed EVM address"),

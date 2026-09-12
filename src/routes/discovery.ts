@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { fileURLToPath } from "node:url";
 import type { Config } from "../config.js";
 import { ENDPOINTS, type Endpoint } from "../x402/catalog.js";
 
@@ -51,6 +52,7 @@ export function buildOpenApi(cfg: Config): Record<string, unknown> {
       version: "0.1.0",
       description:
         "Japanese text-to-structure APIs (address normalization, business-text normalization, corporate entity resolution). Pay per call in USDC via x402.",
+      contact: { name: cfg.SERVICE_NAME, email: cfg.CONTACT_EMAIL, url: cfg.PUBLIC_BASE_URL },
     },
     servers: [{ url: cfg.PUBLIC_BASE_URL }],
     "x-discovery": { ownershipProofs: [cfg.PAY_TO_ADDRESS] },
@@ -74,6 +76,10 @@ export function discoveryRouter(cfg: Config): Router {
   const openapi = buildOpenApi(cfg);
   const wellKnown = buildWellKnown(cfg);
 
+  const faviconPath = fileURLToPath(new URL("../../public/favicon.ico", import.meta.url));
+  router.get("/favicon.ico", (_req, res) => {
+    res.type("image/x-icon").set("Cache-Control", "public, max-age=86400").sendFile(faviconPath);
+  });
   router.get("/health", (_req, res) => {
     res.json({ ok: true, network: cfg.networkId, endpoints: ENDPOINTS.length });
   });
