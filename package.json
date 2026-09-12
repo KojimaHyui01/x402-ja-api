@@ -29,6 +29,7 @@
     "express": "^5.2.1",
     "tsx": "^4.23.13",
     "viem": "^2.56.3",
+    "zengin-code": "^1.0.0-p20260824",
     "zod": "^3.25.76"
   },
   "devDependencies": {

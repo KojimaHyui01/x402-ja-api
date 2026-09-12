@@ -72,6 +72,24 @@ const BUSINESS_DAY_INPUT_SCHEMA = {
   },
 } as const;
 
+const BANK_RESOLVE_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    bank: { type: "string", maxLength: 100, description: "Bank / 信用金庫 / 信用組合 / 労働金庫 / JA name in any notation (kanji, kana, romaji, with or without 銀行)" },
+    branch: { type: "string", maxLength: 100, description: "Optional branch name (支店 suffix optional; ゆうちょ numeric names accepted)" },
+  },
+  required: ["bank"],
+} as const;
+
+const BANK_LOOKUP_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    bankCode: { type: "string", pattern: "^[0-9]{4}$", description: "4-digit 金融機関コード" },
+    branchCode: { type: "string", pattern: "^[0-9]{3}$", description: "Optional 3-digit 支店コード" },
+  },
+  required: ["bankCode"],
+} as const;
+
 export const ENDPOINTS: readonly Endpoint[] = [
   {
     key: "GET /v1/jp/holidays",
@@ -121,6 +139,51 @@ export const ENDPOINTS: readonly Endpoint[] = [
       add: 1,
       result: "2026-09-24",
       lastBusinessDayOfMonth: "2026-09-30",
+    },
+  },
+  {
+    key: "GET /v1/jp/bank/resolve",
+    method: "GET",
+    path: "/v1/jp/bank/resolve",
+    kind: "query",
+    price: "$0.02",
+    summary: "Resolve a Japanese bank and branch name to 金融機関コード / 支店コード",
+    description:
+      "Fuzzy-matches bank and branch names (kanji, kana, romaji; 銀行/支店 optional; 信用金庫→信金, JA→農協) to official zengin codes and returns ranked candidates with confidence, plus half-width kana names ready for 全銀 transfer files. Covers 1,146 institutions and ~29,000 branches.",
+    tags: ["japan", "bank", "branch", "zengin", "payments", "entity-resolution", "finance"],
+    input: { bank: "三菱UFJ銀行", branch: "新宿支店" },
+    inputSchema: BANK_RESOLVE_INPUT_SCHEMA,
+    outputExample: {
+      bank: {
+        query: "三菱UFJ銀行",
+        canonical: "三菱UFJ",
+        confident: true,
+        candidates: [{ code: "0005", name: "三菱ＵＦＪ", kana: "ミツビシユ－エフジエイ", kanaHalfWidth: "ﾐﾂﾋﾞｼﾕｰｴﾌｼﾞｴｲ", kind: "bank", score: 1, matchedOn: "name" }],
+      },
+      branch: {
+        bankCode: "0005",
+        query: "新宿支店",
+        canonical: "新宿",
+        confident: true,
+        candidates: [{ code: "341", name: "新宿", kana: "シンジユク", kanaHalfWidth: "ｼﾝｼﾞﾕｸ", score: 1, matchedOn: "name" }],
+      },
+      best: { bankCode: "0005", bankName: "三菱ＵＦＪ", branchCode: "341", branchName: "新宿", confident: true },
+    },
+  },
+  {
+    key: "GET /v1/jp/bank/lookup",
+    method: "GET",
+    path: "/v1/jp/bank/lookup",
+    kind: "query",
+    price: "$0.005",
+    summary: "Look up a Japanese bank / branch by code",
+    description: "Exact lookup of 金融機関コード (and optional 支店コード) → official names, kana, half-width kana, romaji and institution kind.",
+    tags: ["japan", "bank", "branch", "zengin", "lookup"],
+    input: { bankCode: "0001", branchCode: "001" },
+    inputSchema: BANK_LOOKUP_INPUT_SCHEMA,
+    outputExample: {
+      bank: { code: "0001", name: "みずほ", kana: "ミズホ", kanaHalfWidth: "ﾐｽﾞﾎ", hira: "みずほ", roma: "mizuho", kind: "bank", branchCount: 494 },
+      branch: { code: "001", name: "東京営業部", kana: "トウキヨウ", kanaHalfWidth: "ﾄｳｷﾖｳ", hira: "とうきよう", roma: "toukiyou" },
     },
   },
   {

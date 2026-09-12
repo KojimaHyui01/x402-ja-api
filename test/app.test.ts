@@ -32,7 +32,7 @@ describe("discovery documents", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.network).toBe("eip155:84532");
-    expect(r.body.endpoints).toBe(5);
+    expect(r.body.endpoints).toBe(7);
   });
 
   it("serves an OpenAPI doc with x-payment-info on every operation", async () => {
@@ -101,6 +101,23 @@ describe("handlers (paywall disabled)", () => {
     expect(r.body.lastBusinessDayOfMonth).toBe("2026-12-30");
     expect((await request(app).get("/v1/jp/business-day?date=2026-02-30")).status).toBe(400);
     expect((await request(app).get("/v1/jp/business-day?calendar=lunar")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/bank/resolve returns bank + branch + best", async () => {
+    const r = await request(app).get("/v1/jp/bank/resolve?bank=%E3%81%BF%E3%81%9A%E3%81%BB%E9%8A%80%E8%A1%8C&branch=%E6%96%B0%E5%AE%BF%E6%94%AF%E5%BA%97");
+    expect(r.status).toBe(200);
+    expect(r.body.best).toEqual({ bankCode: "0001", bankName: "みずほ", branchCode: "240", branchName: "新宿", confident: true });
+    expect(r.body.branch.candidates[0].kanaHalfWidth).toBe("ｼﾝｼﾞﾕｸ");
+    expect((await request(app).get("/v1/jp/bank/resolve")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/bank/lookup returns names by code, 404 for unknown", async () => {
+    const r = await request(app).get("/v1/jp/bank/lookup?bankCode=9900&branchCode=108");
+    expect(r.status).toBe(200);
+    expect(r.body.bank.kind).toBe("jp-bank");
+    expect(r.body.branch.name).toBe("一〇八");
+    expect((await request(app).get("/v1/jp/bank/lookup?bankCode=0000")).status).toBe(404);
+    expect((await request(app).get("/v1/jp/bank/lookup?bankCode=12")).status).toBe(400);
   });
 
   it("GET /v1/jp/business-day defaults to today (JST)", async () => {

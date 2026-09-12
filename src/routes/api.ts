@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { AddressInputError, normalizeAddress } from "../lib/address.js";
+import { BankInputError, lookupBank, resolveBank, resolveBranch } from "../lib/bank.js";
 import {
   CalendarInputError,
   HOLIDAY_DATA_RANGE,
@@ -36,6 +37,16 @@ const BusinessDayQuery = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   add: z.coerce.number().int().min(-2000).max(2000).default(0),
   calendar: z.enum(["standard", "bank"]).default("standard"),
+});
+
+const BankResolveQuery = z.object({
+  bank: z.string().min(1).max(100),
+  branch: z.string().min(1).max(100).optional(),
+});
+
+const BankLookupQuery = z.object({
+  bankCode: z.string().regex(/^\d{4}$/),
+  branchCode: z.string().regex(/^\d{3}$/).optional(),
 });
 
 /** Today's date in Japan (UTC+9), as YYYY-MM-DD. */
@@ -97,6 +108,41 @@ export function apiRouter(deps: ApiDeps): Router {
       if (err instanceof CalendarInputError) return badRequest(res, err.message);
       throw err;
     }
+  });
+
+  router.get("/v1/jp/bank/resolve", (req, res) => {
+    const q = parseQuery(BankResolveQuery, req, res);
+    if (!q) return;
+    try {
+      const bank = resolveBank(q.bank);
+      const topBank = bank.candidates[0];
+      const branch = q.branch && topBank ? { bankCode: topBank.code, ...resolveBranch(topBank.code, q.branch) } : null;
+      const topBranch = branch?.candidates[0];
+      const best = topBank
+        ? {
+            bankCode: topBank.code,
+            bankName: topBank.name,
+            branchCode: topBranch?.code ?? null,
+            branchName: topBranch?.name ?? null,
+            confident: bank.confident && (branch === null || branch.confident),
+          }
+        : null;
+      res.json({ bank, branch, best });
+    } catch (err) {
+      if (err instanceof BankInputError) return badRequest(res, err.message);
+      throw err;
+    }
+  });
+
+  router.get("/v1/jp/bank/lookup", (req, res) => {
+    const q = parseQuery(BankLookupQuery, req, res);
+    if (!q) return;
+    const found = lookupBank(q.bankCode, q.branchCode);
+    if (!found) {
+      res.status(404).json({ error: "not_found", message: `unknown bank code ${q.bankCode}` });
+      return;
+    }
+    res.json(found);
   });
 
   router.post("/v1/address/normalize", async (req, res, next) => {
