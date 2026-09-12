@@ -1,0 +1,85 @@
+# x402-ja-api
+
+日本語テキストを「構造化」して返すAPI群。AIエージェントが **x402** プロトコルで1コールごとにUSDCを払って使う。
+
+| Endpoint | 価格 | 何をするか |
+|---|---|---|
+| `POST /v1/address/normalize` | $0.02 | 住所の表記揺れを吸収し pref/city/town/addr + 緯度経度を返す（デジタル庁アドレス・ベース・レジストリ / Geolonia） |
+| `POST /v1/text/normalize` | $0.01 | 全角→半角、和暦→ISO日付、電話番号(E.164)/郵便番号/メール抽出 |
+| `POST /v1/company/resolve` | $0.03 | 社名の揺れ→法人番号・正式商号・本店所在地・インボイス番号形式（国税庁 法人番号Web-API） |
+
+無料で読めるもの: `GET /` `GET /health` `GET /openapi.json` `GET /.well-known/x402`
+
+## 動かす
+
+```bash
+cp .env.example .env      # PAY_TO_ADDRESS を自分のウォレットに
+npm install
+npm run dev               # http://localhost:4021
+npm run doctor            # 発見用ドキュメントと402応答の自己診断
+npm run check             # 型チェック + テスト
+```
+
+未払いで叩くと `402` と `PAYMENT-REQUIRED` ヘッダ（base64 JSON）が返る:
+
+```bash
+curl -i -X POST localhost:4021/v1/text/normalize \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"令和５年４月１日 ＴＥＬ ０３－１２３４－５６７８"}'
+```
+
+支払いを含むE2E（テストネット・買い手用の別ウォレットが必要）:
+
+```bash
+# Base Sepolia の USDC を https://faucet.circle.com で受け取っておく
+BUYER_PRIVATE_KEY=0x... npm run probe -- http://localhost:4021 /v1/text/normalize
+```
+
+## 本番に出す手順
+
+1. **ウォレット**: 受取専用のEVMアドレスを新規作成し `PAY_TO_ADDRESS` に設定（秘密鍵はサーバーに置かない。受け取るだけなので不要）
+2. **Coinbase CDP**: https://portal.cdp.coinbase.com でAPIキーを発行 → `CDP_API_KEY_ID` / `CDP_API_KEY_SECRET`、`X402_NETWORK=base`
+   （facilitator手数料: 1,000件まで無料、以降 $0.001/件。ガス代はfacilitator負担）
+3. **法人番号API**: https://www.houjin-bangou.nta.go.jp/webapi/ でアプリケーションIDを申請 → `HOJIN_APP_ID`
+   発行まで2〜4週間。届くまで `/v1/company/resolve` は 503 を返す
+4. **デプロイ**: 恒久的なドメインが必須（x402scanはngrok等のトンネルを拒否）。Render / Fly.io / Railway の無料〜最小プランで十分。`PUBLIC_BASE_URL` を実URLに
+5. **自己診断**: `npm run doctor -- https://your-domain`
+6. **登録（発見されるため）**
+   - x402scan: `POST https://www.x402scan.com/api/x402/registry/register-origin {"origin":"https://your-domain"}` または UI から
+   - CDP Bazaar: 最初の決済が通ると自動索引（`declareDiscoveryExtension` 済み）
+   - Circle Agent Marketplace: https://agents.circle.com/services の申請フォーム
+   - x402Relay（日本）: https://x402relay.jp 系のカタログに申請
+
+## 構成
+
+```
+src/
+  config.ts            環境変数の検証（zod）。base 指定時は CDP キー必須
+  lib/text.ts          純関数: 半角化 / 和暦 / 電話 / 郵便番号 / メール
+  lib/address.ts       Geolonia 住所正規化のラッパー
+  lib/csv.ts, hojin.ts 国税庁 Web-API v4 クライアント + CSV パーサ + チェックデジット
+  lib/company.ts       名寄せ・ランキング
+  x402/catalog.ts      売り物の定義（価格・説明・スキーマ）= 唯一の正
+  x402/server.ts       facilitator 選択・ルート設定・Bazaar 拡張
+  routes/api.ts        有料ハンドラ（zod で入力検証）
+  routes/discovery.ts  /openapi.json, /.well-known/x402, /health
+  app.ts               Express 組み立て（テストは paywall:false / facilitator スタブ）
+scripts/
+  doctor.ts            デプロイ後の自己診断
+  probe.ts             実際に払うクライアント
+```
+
+## 注意（法務・税務）
+
+- USDC の受取自体に登録は不要。受け取った対価は円換算で**雑所得**、保有中の為替差損益も雑所得
+- 法人番号データ利用時は「このサービスは国税庁法人番号システムWeb-API機能を利用して取得した情報をもとに作成しているが、サービスの内容は国税庁によって保証されたものではない」旨の表示が必要（`/` のレスポンスに追加予定）
+- 住所データは Geolonia（アドレス・ベース・レジストリ由来）。ライブラリの利用条件に従う
+
+## 次にやること
+
+- [ ] `PAY_TO_ADDRESS` を本物のウォレットに
+- [ ] 法人番号 Web-API のアプリケーションID申請（リードタイムが一番長いので最初に）
+- [ ] Render/Fly にデプロイ、`doctor` 通す
+- [ ] x402scan / Circle / x402Relay に登録
+- [ ] 死活監視（落ちたら通知）— 登録済みルートの79%が死んでいる市場なので、生きているだけで上位
+- [ ] インボイス登録番号の**有効性検証**（国税庁 適格請求書発行事業者公表システム Web-API、別途ID申請）
