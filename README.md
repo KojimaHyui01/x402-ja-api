@@ -8,6 +8,8 @@
 | `GET /v1/jp/business-day?date=&add=&calendar=` | $0.005 | 営業日判定・N営業日後・月末営業日（`calendar=bank` で12/31〜1/3も休業扱い） |
 | `GET /v1/jp/bank/resolve?bank=&branch=` | $0.02 | 銀行名・支店名の揺れ→金融機関コード・支店コード（候補＋確信度、全銀用半角カナ付き。zengin-code 1,146機関/29,000支店） |
 | `GET /v1/jp/bank/lookup?bankCode=&branchCode=` | $0.005 | コード→正式名・カナ・半角カナ・種別 |
+| `GET /v1/jp/name/parse?name=&kana=` | $0.02 | 姓名分割（辞書12k姓/76k名、分割99.7%）＋読み候補（確信度付き）＋パスポート式ローマ字。`kana` を渡せば決定的 |
+| `GET /v1/jp/name/romaji?kana=` | $0.005 | かな→ヘボン式（外務省パスポート規則：長音省略・ン→M・促音・CH前T）＋OH式・マクロン・厳密表記 |
 | `POST /v1/address/normalize` | $0.02 | 住所の表記揺れを吸収し pref/city/town/addr + 緯度経度を返す（デジタル庁アドレス・ベース・レジストリ / Geolonia） |
 | `POST /v1/text/normalize` | $0.01 | 全角→半角、和暦→ISO日付、電話番号(E.164)/郵便番号/メール抽出 |
 | `POST /v1/company/resolve` | $0.03 | 社名の揺れ→法人番号・正式商号・本店所在地・インボイス番号形式（国税庁 法人番号Web-API） |
@@ -65,6 +67,8 @@ src/
   lib/company.ts       名寄せ・ランキング
   lib/calendar.ts      祝日・営業日計算（data/holidays.json を読む）
   lib/bank.ts          銀行・支店コード解決（zengin-code、表記揺れ・カナ・半角カナ）
+  lib/romaji.ts        かな→ヘボン式ローマ字（パスポート規則）
+  lib/name.ts          姓名分割・読み候補（data/names/dict.json）
   x402/catalog.ts      売り物の定義（価格・説明・スキーマ）= 唯一の正
   x402/server.ts       facilitator 選択・ルート設定・Bazaar 拡張
   routes/api.ts        有料ハンドラ（zod で入力検証）
@@ -72,6 +76,7 @@ src/
   app.ts               Express 組み立て（テストは paywall:false / facilitator スタブ）
 scripts/
   update-holidays.ts   内閣府CSV → data/holidays.json（年1回、翌年分が出る2月頃に実行）
+  build-name-dict.ts   mecab-ipadic 人名 + MITデータセット → data/names/dict.json
   doctor.ts            デプロイ後の自己診断
   probe.ts             実際に払うクライアント
 ```
@@ -83,6 +88,7 @@ scripts/
 - 住所データは Geolonia（アドレス・ベース・レジストリ由来）。ライブラリの利用条件に従う
 - 祝日データは内閣府「国民の祝日」CSV（政府標準利用規約 v2.0、出典明記）
 - 銀行・支店データは zengin-code（MIT、公開情報から自動収集）。`npm update zengin-code` で追従
+- 人名辞書は mecab-ipadic（NAISTライセンス、`data/names/IPADIC-COPYING.txt`）と japanese-personal-name-dataset（MIT）由来
 
 ## 次にやること
 

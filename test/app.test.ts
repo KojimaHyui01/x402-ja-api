@@ -32,7 +32,7 @@ describe("discovery documents", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.network).toBe("eip155:84532");
-    expect(r.body.endpoints).toBe(7);
+    expect(r.body.endpoints).toBe(9);
   });
 
   it("serves an OpenAPI doc with x-payment-info on every operation", async () => {
@@ -118,6 +118,25 @@ describe("handlers (paywall disabled)", () => {
     expect(r.body.branch.name).toBe("一〇八");
     expect((await request(app).get("/v1/jp/bank/lookup?bankCode=0000")).status).toBe(404);
     expect((await request(app).get("/v1/jp/bank/lookup?bankCode=12")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/name/parse splits, reads and romanizes", async () => {
+    const r = await request(app).get("/v1/jp/name/parse?name=%E4%BD%90%E8%97%A4%E8%A3%95%E5%AD%90");
+    expect(r.status).toBe(200);
+    expect(r.body.family.kanji).toBe("佐藤");
+    expect(r.body.given.kanji).toBe("裕子");
+    expect(r.body.romaji.passport).toBe("SATO YUKO");
+    const k = await request(app).get("/v1/jp/name/parse?name=%E4%BD%90%E8%97%A4%E8%A3%95%E5%AD%90&kana=%E3%81%95%E3%81%A8%E3%81%86%20%E3%81%B2%E3%82%8D%E3%81%93");
+    expect(k.body.romaji).toMatchObject({ basis: "provided-kana", passport: "SATO HIROKO" });
+    expect((await request(app).get("/v1/jp/name/parse")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/name/romaji handles one or two tokens", async () => {
+    const two = await request(app).get("/v1/jp/name/romaji?kana=%E3%81%8A%E3%81%8A%E3%81%AE%20%E3%82%8A%E3%82%87%E3%81%86");
+    expect(two.body.passport).toBe("ONO RYO");
+    const one = await request(app).get("/v1/jp/name/romaji?kana=%E3%81%AF%E3%81%A3%E3%81%A8%E3%82%8A");
+    expect(one.body.passport).toBe("HATTORI");
+    expect((await request(app).get("/v1/jp/name/romaji?kana=%E4%BD%90%E8%97%A4")).status).toBe(400);
   });
 
   it("GET /v1/jp/business-day defaults to today (JST)", async () => {

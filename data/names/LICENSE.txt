@@ -1,0 +1,3 @@
+surnames.csv / given-names.csv are derived from
+https://github.com/shuheilocale/japanese-personal-name-dataset (MIT License, Copyright (c) 2022 shuheilocale).
+Surname rankings originally sourced from 名字由来net. Used here for name splitting and reading candidates.

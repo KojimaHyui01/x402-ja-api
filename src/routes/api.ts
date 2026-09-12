@@ -13,6 +13,8 @@ import {
 } from "../lib/calendar.js";
 import { CompanyInputError, resolveCompany } from "../lib/company.js";
 import { HojinApiError, HojinClient, HojinParseError } from "../lib/hojin.js";
+import { NameInputError, parseName } from "../lib/name.js";
+import { RomajiInputError, kanaToRomaji, romanizeName } from "../lib/romaji.js";
 import { normalizeText } from "../lib/text.js";
 
 const AddressBody = z.object({
@@ -47,6 +49,15 @@ const BankResolveQuery = z.object({
 const BankLookupQuery = z.object({
   bankCode: z.string().regex(/^\d{4}$/),
   branchCode: z.string().regex(/^\d{3}$/).optional(),
+});
+
+const NameParseQuery = z.object({
+  name: z.string().min(1).max(40),
+  kana: z.string().min(1).max(100).optional(),
+});
+
+const NameRomajiQuery = z.object({
+  kana: z.string().min(1).max(100),
 });
 
 /** Today's date in Japan (UTC+9), as YYYY-MM-DD. */
@@ -143,6 +154,29 @@ export function apiRouter(deps: ApiDeps): Router {
       return;
     }
     res.json(found);
+  });
+
+  router.get("/v1/jp/name/parse", (req, res) => {
+    const q = parseQuery(NameParseQuery, req, res);
+    if (!q) return;
+    try {
+      res.json(parseName(q.name, q.kana));
+    } catch (err) {
+      if (err instanceof NameInputError || err instanceof RomajiInputError) return badRequest(res, err.message);
+      throw err;
+    }
+  });
+
+  router.get("/v1/jp/name/romaji", (req, res) => {
+    const q = parseQuery(NameRomajiQuery, req, res);
+    if (!q) return;
+    try {
+      const parts = q.kana.trim().split(/[\s　、，,・]+/).filter((p) => p !== "");
+      res.json(parts.length >= 2 ? romanizeName(q.kana) : kanaToRomaji(q.kana));
+    } catch (err) {
+      if (err instanceof RomajiInputError) return badRequest(res, err.message);
+      throw err;
+    }
   });
 
   router.post("/v1/address/normalize", async (req, res, next) => {

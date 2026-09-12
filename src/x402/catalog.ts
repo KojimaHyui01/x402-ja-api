@@ -90,6 +90,23 @@ const BANK_LOOKUP_INPUT_SCHEMA = {
   required: ["bankCode"],
 } as const;
 
+const NAME_PARSE_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string", maxLength: 40, description: "Full name in kanji, e.g. 山田太郎 (a space between family and given name is honoured)" },
+    kana: { type: "string", maxLength: 100, description: "Optional known reading \"<family kana> <given kana>\" — makes readings and romaji deterministic" },
+  },
+  required: ["name"],
+} as const;
+
+const NAME_ROMAJI_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    kana: { type: "string", maxLength: 100, description: "Kana reading: \"さとう ゆうこ\" (family given) or a single token" },
+  },
+  required: ["kana"],
+} as const;
+
 export const ENDPOINTS: readonly Endpoint[] = [
   {
     key: "GET /v1/jp/holidays",
@@ -184,6 +201,52 @@ export const ENDPOINTS: readonly Endpoint[] = [
     outputExample: {
       bank: { code: "0001", name: "みずほ", kana: "ミズホ", kanaHalfWidth: "ﾐｽﾞﾎ", hira: "みずほ", roma: "mizuho", kind: "bank", branchCount: 494 },
       branch: { code: "001", name: "東京営業部", kana: "トウキヨウ", kanaHalfWidth: "ﾄｳｷﾖｳ", hira: "とうきよう", roma: "toukiyou" },
+    },
+  },
+  {
+    key: "GET /v1/jp/name/parse",
+    method: "GET",
+    path: "/v1/jp/name/parse",
+    kind: "query",
+    price: "$0.02",
+    summary: "Split a Japanese personal name and get reading candidates + passport romaji",
+    description:
+      "Splits a kanji full name into family/given (dictionary of 12k surnames / 76k given names; 99.7% split accuracy out-of-sample), returns ranked reading candidates with confidence, and romanizes with 外務省 passport Hepburn rules. Given-name readings are ambiguous by nature — pass `kana` when you have it for a deterministic result.",
+    tags: ["japan", "name", "person", "furigana", "romaji", "hepburn", "kyc", "shipping", "text-to-structure"],
+    input: { name: "佐藤裕子" },
+    inputSchema: NAME_PARSE_INPUT_SCHEMA,
+    outputExample: {
+      input: "佐藤裕子",
+      family: { kanji: "佐藤", readings: [{ kana: "さとう", score: 0.97, source: "dictionary" }], confidence: "high" },
+      given: {
+        kanji: "裕子",
+        readings: [{ kana: "ゆうこ", score: 0.86, source: "dictionary" }, { kana: "ひろこ", score: 0.86, source: "dictionary" }, { kana: "のぶこ", score: 0.78, source: "dictionary" }],
+        confidence: "medium",
+      },
+      split: { method: "dictionary", confidence: 0.95 },
+      romaji: { basis: "best-guess", passport: "SATO YUKO", western: "Yuko Sato", family: "SATO", given: "YUKO" },
+      notes: ["given-name reading is ambiguous; candidates are ordered by likelihood — pass `kana` when known"],
+    },
+  },
+  {
+    key: "GET /v1/jp/name/romaji",
+    method: "GET",
+    path: "/v1/jp/name/romaji",
+    kind: "query",
+    price: "$0.005",
+    summary: "Kana → Hepburn romaji (passport rules) with alternative styles",
+    description:
+      "Deterministic romanization of a kana name: 外務省 passport form (SATO, ONO, YOKOO, NAMBA, HATCHI), OH-style (SATOH), macron Hepburn (Satō) and strict letter-by-letter (satou). Handles 長音・撥音・促音 rules exactly as the passport office does.",
+    tags: ["japan", "name", "romaji", "hepburn", "passport", "shipping"],
+    input: { kana: "さとう ゆうこ" },
+    inputSchema: NAME_ROMAJI_INPUT_SCHEMA,
+    outputExample: {
+      input: "さとう ゆうこ",
+      family: { kana: "サトウ", passport: "SATO", capitalized: "Sato", ohStyle: "SATOH", macron: "Satō", hepburn: "satou" },
+      given: { kana: "ユウコ", passport: "YUKO", capitalized: "Yuko", ohStyle: "YUKO", macron: "Yūko", hepburn: "yuuko" },
+      passport: "SATO YUKO",
+      western: "Yuko Sato",
+      eastern: "Sato Yuko",
     },
   },
   {
