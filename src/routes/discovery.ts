@@ -71,6 +71,8 @@ export function buildWellKnown(cfg: Config): Record<string, unknown> {
   };
 }
 
+const EOL = String.fromCharCode(10);
+
 /** x402Relay manifest scanner format (https://docs.x402-relay.com/providers/register/). */
 export function buildAiTxt(cfg: Config): string {
   const cheapest = ENDPOINTS.reduce((min, e) => (parseFloat(e.price.slice(1)) < parseFloat(min.price.slice(1)) ? e : min));
@@ -85,9 +87,7 @@ export function buildAiTxt(cfg: Config): string {
     `contact: ${cfg.CONTACT_EMAIL}`,
     ...ENDPOINTS.map((e) => `x402-resource: ${e.method} ${cfg.PUBLIC_BASE_URL}${e.path} ${e.price}`),
   ];
-  return `${lines.join("
-")}
-`;
+  return `${lines.join(EOL)}${EOL}`;
 }
 
 export function discoveryRouter(cfg: Config): Router {
