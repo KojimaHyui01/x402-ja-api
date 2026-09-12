@@ -38,9 +38,16 @@ export class ConfigError extends Error {
   }
 }
 
+/** Hosting dashboards often send blank strings for unset vars; treat those as absent. */
+function dropBlank(env: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).filter((kv): kv is [string, string] => typeof kv[1] === "string" && kv[1].trim() !== ""),
+  );
+}
+
 /** Validate environment at startup and fail fast with a readable message. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = EnvSchema.safeParse(env);
+  const parsed = EnvSchema.safeParse(dropBlank(env));
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`);
     throw new ConfigError(`Invalid environment:\n${lines.join("\n")}`);

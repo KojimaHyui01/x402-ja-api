@@ -13,6 +13,17 @@ const TEST_ENV = {
 
 const cfg = loadConfig(TEST_ENV);
 
+describe("loadConfig", () => {
+  it("treats blank strings as unset (Render sends '' for empty env vars)", () => {
+    const c = loadConfig({ ...TEST_ENV, HOJIN_APP_ID: "", CDP_API_KEY_ID: "   " });
+    expect(c.HOJIN_APP_ID).toBeUndefined();
+    expect(c.CDP_API_KEY_ID).toBeUndefined();
+  });
+  it("requires CDP keys on mainnet", () => {
+    expect(() => loadConfig({ ...TEST_ENV, X402_NETWORK: "base" })).toThrow(/CDP_API_KEY_ID/);
+  });
+});
+
 describe("discovery documents", () => {
   const app = createApp(cfg, { paywall: false });
 
