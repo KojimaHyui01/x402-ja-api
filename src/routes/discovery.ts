@@ -71,6 +71,25 @@ export function buildWellKnown(cfg: Config): Record<string, unknown> {
   };
 }
 
+/** x402Relay manifest scanner format (https://docs.x402-relay.com/providers/register/). */
+export function buildAiTxt(cfg: Config): string {
+  const cheapest = ENDPOINTS.reduce((min, e) => (parseFloat(e.price.slice(1)) < parseFloat(min.price.slice(1)) ? e : min));
+  const lines = [
+    `x402-endpoint: ${cfg.PUBLIC_BASE_URL}`,
+    `x402-network: ${cfg.isMainnet ? "base" : "base-sepolia"}`,
+    "x402-asset: USDC",
+    `x402-price: ${cheapest.price.slice(1)}`,
+    `x402-pay-to: ${cfg.PAY_TO_ADDRESS}`,
+    `x402-openapi: ${cfg.PUBLIC_BASE_URL}/openapi.json`,
+    `x402-well-known: ${cfg.PUBLIC_BASE_URL}/.well-known/x402`,
+    `contact: ${cfg.CONTACT_EMAIL}`,
+    ...ENDPOINTS.map((e) => `x402-resource: ${e.method} ${cfg.PUBLIC_BASE_URL}${e.path} ${e.price}`),
+  ];
+  return `${lines.join("
+")}
+`;
+}
+
 export function discoveryRouter(cfg: Config): Router {
   const router = Router();
   const openapi = buildOpenApi(cfg);
@@ -85,6 +104,8 @@ export function discoveryRouter(cfg: Config): Router {
   });
   router.get("/openapi.json", (_req, res) => res.json(openapi));
   router.get(["/.well-known/x402", "/.well-known/x402.json"], (_req, res) => res.json(wellKnown));
+  const aiTxt = buildAiTxt(cfg);
+  router.get("/.well-known/ai.txt", (_req, res) => res.type("text/plain").send(aiTxt));
   router.get("/", (_req, res) => {
     res.json({
       service: cfg.SERVICE_NAME,

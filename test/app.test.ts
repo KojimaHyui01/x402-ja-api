@@ -53,6 +53,16 @@ describe("discovery documents", () => {
     expect(f.headers["content-type"]).toMatch(/image\/x-icon/);
   });
 
+  it("serves /.well-known/ai.txt for the x402Relay manifest scanner", async () => {
+    const r = await request(app).get("/.well-known/ai.txt");
+    expect(r.status).toBe(200);
+    expect(r.headers["content-type"]).toMatch(/text\/plain/);
+    expect(r.text).toContain("x402-endpoint: https://example.test");
+    expect(r.text).toContain("x402-network: base-sepolia");
+    expect(r.text).toContain("x402-price: 0.01");
+    expect(r.text).toContain(`x402-pay-to: ${TEST_ENV.PAY_TO_ADDRESS}`);
+  });
+
   it("serves /.well-known/x402 with absolute resource URLs", async () => {
     const r = await request(app).get("/.well-known/x402");
     expect(r.status).toBe(200);
