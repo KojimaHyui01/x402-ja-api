@@ -44,12 +44,11 @@ export function buildRoutes(cfg: Config): RoutesConfig {
         mimeType: "application/json",
         serviceName: cfg.SERVICE_NAME,
         tags: [...e.tags],
-        extensions: declareDiscoveryExtension({
-          bodyType: "json",
-          input: { ...e.input },
-          inputSchema: { ...e.inputSchema },
-          output: { example: e.outputExample },
-        }),
+        extensions: declareDiscoveryExtension(
+          e.kind === "body"
+            ? { bodyType: "json", input: { ...e.input }, inputSchema: { ...e.inputSchema }, output: { example: e.outputExample } }
+            : { input: { ...e.input }, inputSchema: { ...e.inputSchema }, output: { example: e.outputExample } },
+        ),
       },
     ]),
   );

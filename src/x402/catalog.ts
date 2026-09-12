@@ -8,6 +8,8 @@ export interface Endpoint {
   readonly key: `${"GET" | "POST"} /${string}`;
   readonly method: "GET" | "POST";
   readonly path: string;
+  /** "body" = JSON request body (POST); "query" = URL query parameters (GET) */
+  readonly kind: "body" | "query";
   /** USD price string accepted by x402 ("$0.02") */
   readonly price: string;
   readonly summary: string;
@@ -48,11 +50,84 @@ const COMPANY_INPUT_SCHEMA = {
   required: ["query"],
 } as const;
 
+const HOLIDAYS_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    year: { type: "integer", minimum: 1955, maximum: 2100, description: "Western calendar year" },
+  },
+  required: ["year"],
+} as const;
+
+const BUSINESS_DAY_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    date: { type: "string", format: "date", description: "Base date YYYY-MM-DD (default: today in JST)" },
+    add: { type: "integer", minimum: -2000, maximum: 2000, default: 0, description: "Business days to add (negative = go back)" },
+    calendar: {
+      type: "string",
+      enum: ["standard", "bank"],
+      default: "standard",
+      description: "standard = Sat/Sun/public holidays closed; bank = also Dec 31-Jan 3 (Japanese bank holidays)",
+    },
+  },
+} as const;
+
 export const ENDPOINTS: readonly Endpoint[] = [
+  {
+    key: "GET /v1/jp/holidays",
+    method: "GET",
+    path: "/v1/jp/holidays",
+    kind: "query",
+    price: "$0.005",
+    summary: "Japanese public holidays for a year",
+    description:
+      "Official 国民の祝日 list for a given year including substitute holidays (振替休日) and 国民の休日, straight from the Cabinet Office dataset. Coverage 1955-2027, refreshed yearly.",
+    tags: ["japan", "holidays", "calendar", "dates"],
+    input: { year: 2026 },
+    inputSchema: HOLIDAYS_INPUT_SCHEMA,
+    outputExample: {
+      year: 2026,
+      count: 19,
+      holidays: [
+        { date: "2026-01-01", name: "元日" },
+        { date: "2026-01-12", name: "成人の日" },
+        { date: "2026-09-22", name: "休日" },
+      ],
+      source: "内閣府 https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html",
+    },
+  },
+  {
+    key: "GET /v1/jp/business-day",
+    method: "GET",
+    path: "/v1/jp/business-day",
+    kind: "query",
+    price: "$0.005",
+    summary: "Japanese business-day calculator",
+    description:
+      "Is this date a Japanese business day? Add or subtract N business days (payment due dates, SLA deadlines, 月末営業日) honoring weekends, public holidays and optionally Japanese bank holidays (Dec 31-Jan 3).",
+    tags: ["japan", "business-days", "calendar", "dates", "finance"],
+    input: { date: "2026-09-18", add: 1, calendar: "bank" },
+    inputSchema: BUSINESS_DAY_INPUT_SCHEMA,
+    outputExample: {
+      date: "2026-09-18",
+      weekday: "Friday",
+      isWeekend: false,
+      isHoliday: false,
+      holidayName: null,
+      isBusinessDay: true,
+      calendar: "bank",
+      nextBusinessDay: "2026-09-24",
+      previousBusinessDay: "2026-09-17",
+      add: 1,
+      result: "2026-09-24",
+      lastBusinessDayOfMonth: "2026-09-30",
+    },
+  },
   {
     key: "POST /v1/address/normalize",
     method: "POST",
     path: "/v1/address/normalize",
+    kind: "body",
     price: "$0.02",
     summary: "Normalize a Japanese address",
     description:
@@ -76,6 +151,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
     key: "POST /v1/text/normalize",
     method: "POST",
     path: "/v1/text/normalize",
+    kind: "body",
     price: "$0.01",
     summary: "Normalize Japanese business text and extract contact fields",
     description:
@@ -95,6 +171,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
     key: "POST /v1/company/resolve",
     method: "POST",
     path: "/v1/company/resolve",
+    kind: "body",
     price: "$0.03",
     summary: "Resolve a Japanese company to its 法人番号 and registered address",
     description:

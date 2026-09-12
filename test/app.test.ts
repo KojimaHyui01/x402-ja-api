@@ -32,6 +32,7 @@ describe("discovery documents", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.network).toBe("eip155:84532");
+    expect(r.body.endpoints).toBe(5);
   });
 
   it("serves an OpenAPI doc with x-payment-info on every operation", async () => {
@@ -59,7 +60,7 @@ describe("discovery documents", () => {
     expect(r.headers["content-type"]).toMatch(/text\/plain/);
     expect(r.text).toContain("x402-endpoint: https://example.test");
     expect(r.text).toContain("x402-network: base-sepolia");
-    expect(r.text).toContain("x402-price: 0.01");
+    expect(r.text).toContain("x402-price: 0.005");
     expect(r.text).toContain(`x402-pay-to: ${TEST_ENV.PAY_TO_ADDRESS}`);
   });
 
@@ -81,6 +82,31 @@ describe("handlers (paywall disabled)", () => {
     expect(r.status).toBe(200);
     expect(r.body.normalized).toBe("2019-04-30 TEL 090-1234-5678");
     expect(r.body.phones[0].e164).toBe("+819012345678");
+  });
+
+  it("GET /v1/jp/holidays lists a year", async () => {
+    const r = await request(app).get("/v1/jp/holidays?year=2026");
+    expect(r.status).toBe(200);
+    expect(r.body.year).toBe(2026);
+    expect(r.body.holidays).toContainEqual({ date: "2026-09-22", name: "休日" });
+    expect((await request(app).get("/v1/jp/holidays?year=1800")).status).toBe(400);
+    expect((await request(app).get("/v1/jp/holidays")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/business-day adds business days on the bank calendar", async () => {
+    const r = await request(app).get("/v1/jp/business-day?date=2026-12-30&add=1&calendar=bank");
+    expect(r.status).toBe(200);
+    expect(r.body.isBusinessDay).toBe(true);
+    expect(r.body.result).toBe("2027-01-04");
+    expect(r.body.lastBusinessDayOfMonth).toBe("2026-12-30");
+    expect((await request(app).get("/v1/jp/business-day?date=2026-02-30")).status).toBe(400);
+    expect((await request(app).get("/v1/jp/business-day?calendar=lunar")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/business-day defaults to today (JST)", async () => {
+    const r = await request(app).get("/v1/jp/business-day");
+    expect(r.status).toBe(200);
+    expect(r.body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("rejects invalid bodies with 400", async () => {
@@ -120,6 +146,14 @@ const stubFacilitator: FacilitatorClient = {
 
 describe("paywall (x402 challenge against a stub facilitator)", () => {
   const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator });
+
+  it("unpaid GET returns 402 too ($0.005 = 5000 micro-USDC)", async () => {
+    const r = await request(app).get("/v1/jp/holidays?year=2026");
+    expect(r.status).toBe(402);
+    const decoded = JSON.parse(Buffer.from(r.headers["payment-required"] as string, "base64").toString("utf8"));
+    expect(decoded.accepts[0].amount).toBe("5000");
+    expect(decoded.extensions?.bazaar?.info?.input?.type).toBe("http");
+  });
 
   it("unpaid POST returns 402 with a PAYMENT-REQUIRED header naming our payTo", async () => {
     const r = await request(app).post("/v1/text/normalize").send({ text: "x" });

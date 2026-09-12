@@ -63,10 +63,11 @@ async function checkWellKnown(): Promise<Check[]> {
 async function check402(): Promise<Check[]> {
   const out: Check[] = [];
   for (const e of ENDPOINTS) {
-    const res = await fetch(`${base}${e.path}`, {
+    const qs = e.kind === "query" ? `?${new URLSearchParams(Object.entries(e.input).map(([k, v]) => [k, String(v)]))}` : "";
+    const res = await fetch(`${base}${e.path}${qs}`, {
       method: e.method,
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(e.input),
+      body: e.kind === "body" ? JSON.stringify(e.input) : undefined,
     });
     const header = res.headers.get("payment-required");
     let detail: string | undefined;

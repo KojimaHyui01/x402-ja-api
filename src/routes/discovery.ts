@@ -17,16 +17,29 @@ function usdcAssetFor(cfg: Config): string {
   return cfg.isMainnet ? USDC_BASE_MAINNET : USDC_BASE_SEPOLIA;
 }
 
+function queryParametersFor(e: Endpoint): readonly Record<string, unknown>[] {
+  const schema = e.inputSchema as { properties?: Record<string, Record<string, unknown>>; required?: readonly string[] };
+  const required = new Set(schema.required ?? []);
+  return Object.entries(schema.properties ?? {}).map(([name, propSchema]) => ({
+    name,
+    in: "query",
+    required: required.has(name),
+    schema: propSchema,
+    example: (e.input as Record<string, unknown>)[name],
+  }));
+}
+
 function operationFor(cfg: Config, e: Endpoint): Record<string, unknown> {
+  const requestShape =
+    e.kind === "body"
+      ? { requestBody: { required: true, content: { "application/json": { schema: e.inputSchema, example: e.input } } } }
+      : { parameters: queryParametersFor(e) };
   return {
     operationId: e.path.replace(/^\/v1\//, "").replace(/\//g, "_"),
     summary: e.summary,
     description: e.description,
     tags: [...e.tags],
-    requestBody: {
-      required: true,
-      content: { "application/json": { schema: e.inputSchema, example: e.input } },
-    },
+    ...requestShape,
     responses: {
       "200": { description: "OK", content: { "application/json": { example: e.outputExample } } },
       "400": { description: "Invalid input" },
