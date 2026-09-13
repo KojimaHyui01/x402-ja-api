@@ -22,14 +22,14 @@ type Json = Record<string, unknown>;
 async function callGet(path: string, params: Record<string, string | number | undefined>): Promise<Json> {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
-  const res = await doFetch(`${BASE}${path}?${qs.toString()}`, { headers: { Accept: "application/json" } });
+  const res = await doFetch(`${BASE}${path}?${qs.toString()}`, { headers: { Accept: "application/json", "X-Free-Tier": "1" } });
   return handle(res);
 }
 
 async function callPost(path: string, body: Json): Promise<Json> {
   const res = await doFetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", "X-Free-Tier": "1" },
     body: JSON.stringify(body),
   });
   return handle(res);

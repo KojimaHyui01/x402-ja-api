@@ -215,16 +215,18 @@ const stubFacilitator: FacilitatorClient = {
 describe("free quota (try before you pay)", () => {
   const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator, freeQuotaPerDay: 2 });
 
-  it("grants N free calls per IP, then 402", async () => {
+  it("grants N free calls per IP only with the opt-in header, then 402", async () => {
     const ip = "203.0.113.7";
-    const a = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip);
+    // crawlers (no header) always see the 402 challenge
+    expect((await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip)).status).toBe(402);
+    const a = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip).set("X-Free-Tier", "1");
     expect(a.status).toBe(200);
-    const b = await request(app).get("/v1/jp/name/romaji?kana=%E3%81%95%E3%81%A8%E3%81%86").set("X-Forwarded-For", ip);
+    const b = await request(app).get("/v1/jp/name/romaji?kana=%E3%81%95%E3%81%A8%E3%81%86").set("X-Forwarded-For", ip).set("X-Free-Tier", "1");
     expect(b.status).toBe(200);
-    const c = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip);
+    const c = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip).set("X-Free-Tier", "1");
     expect(c.status).toBe(402);
     // a different IP has its own quota
-    const d = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "198.51.100.9");
+    const d = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "198.51.100.9").set("X-Free-Tier", "1");
     expect(d.status).toBe(200);
   });
 });

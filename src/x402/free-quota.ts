@@ -1,10 +1,14 @@
 import type { ProtectedRequestHook } from "@x402/core/server";
 
 /**
- * Try-before-you-pay: each client IP gets N free paid-route calls per UTC day; after that the
- * normal x402 402 challenge applies. Requests that already carry a payment header are never
- * counted against the quota. In-memory (per instance) — good enough for a single Render instance.
+ * Try-before-you-pay: a request that opts in with the `X-Free-Tier` header gets up to N free
+ * paid-route calls per client IP per UTC day; after that (or without the header) the normal x402
+ * 402 challenge applies. The opt-in header keeps registry crawlers seeing a real 402, so listings
+ * and trust scores are unaffected. Requests carrying a payment header are never counted.
+ * In-memory (per instance) — good enough for a single Render instance.
  */
+
+export const FREE_TIER_HEADER = "x-free-tier";
 
 export interface FreeQuotaOptions {
   perDay: number;
@@ -46,6 +50,7 @@ export function createFreeQuota(opts: FreeQuotaOptions): FreeQuota {
   const hook: ProtectedRequestHook = async (context) => {
     if (opts.perDay <= 0) return;
     if (context.paymentHeader) return; // paying customer: let x402 handle it
+    if (!context.adapter.getHeader(FREE_TIER_HEADER)) return; // no opt-in → 402 as usual
     const e = entry(clientIp((n) => context.adapter.getHeader(n)));
     if (e.used >= opts.perDay) return; // quota exhausted → 402
     e.used += 1;
