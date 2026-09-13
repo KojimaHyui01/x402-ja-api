@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/KojimaHyui01/x402-ja-api"
+    "url": "git+https://github.com/KojimaHyui01/x402-ja-api.git"
   },
   "homepage": "https://x402-ja-api.onrender.com",
   "files": [
