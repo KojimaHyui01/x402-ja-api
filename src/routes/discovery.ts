@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { fileURLToPath } from "node:url";
 import type { Config } from "../config.js";
+import { WorldCalendarInputError, listCountries, listRegions } from "../lib/world-calendar.js";
 import { ENDPOINTS, type Endpoint } from "../x402/catalog.js";
 
 /**
@@ -64,12 +65,23 @@ export function buildOpenApi(cfg: Config): Record<string, unknown> {
       title: cfg.SERVICE_NAME,
       version: "0.1.0",
       description:
-        "Japanese text-to-structure APIs (address normalization, business-text normalization, corporate entity resolution). Pay per call in USDC via x402.",
+        "Calendar and Japan data APIs for AI agents: worldwide holidays and business days (200+ countries), plus Japanese text-to-structure (address, name, bank, company normalization). Pay per call in USDC via x402, no API key.",
       contact: { name: cfg.SERVICE_NAME, email: cfg.CONTACT_EMAIL, url: cfg.PUBLIC_BASE_URL },
     },
     servers: [{ url: cfg.PUBLIC_BASE_URL }],
     "x-discovery": { ownershipProofs: [cfg.PAY_TO_ADDRESS] },
-    paths: Object.fromEntries(ENDPOINTS.map((e) => [e.path, { [e.method.toLowerCase()]: operationFor(cfg, e) }])),
+    paths: {
+      ...Object.fromEntries(ENDPOINTS.map((e) => [e.path, { [e.method.toLowerCase()]: operationFor(cfg, e) }])),
+      "/v1/holidays/countries": {
+        get: {
+          operationId: "holidays_countries",
+          summary: "Free: list supported countries, or the regions of one country",
+          parameters: [{ name: "country", in: "query", required: false, schema: { type: "string" }, example: "US" }],
+          responses: { "200": { description: "OK" } },
+          "x-payment-info": { protocol: "x402", price: "$0", note: "free reference endpoint" },
+        },
+      },
+    },
   };
 }
 
@@ -116,18 +128,34 @@ export function discoveryRouter(cfg: Config): Router {
     res.json({ ok: true, network: cfg.networkId, endpoints: ENDPOINTS.length });
   });
   router.get("/openapi.json", (_req, res) => res.json(openapi));
+  // Free reference data so agents can pick valid country/region codes before paying.
+  router.get("/v1/holidays/countries", (req, res) => {
+    const country = typeof req.query.country === "string" ? req.query.country : undefined;
+    try {
+      res.set("Cache-Control", "public, max-age=86400");
+      if (country) res.json({ country: country.toUpperCase(), regions: listRegions(country) });
+      else res.json({ count: listCountries().length, countries: listCountries() });
+    } catch (err) {
+      if (err instanceof WorldCalendarInputError) {
+        res.status(400).json({ error: "bad_request", message: err.message });
+        return;
+      }
+      throw err;
+    }
+  });
   router.get(["/.well-known/x402", "/.well-known/x402.json"], (_req, res) => res.json(wellKnown));
   const aiTxt = buildAiTxt(cfg);
   router.get("/.well-known/ai.txt", (_req, res) => res.type("text/plain").send(aiTxt));
   router.get("/", (_req, res) => {
     res.json({
       service: cfg.SERVICE_NAME,
-      description: "Japanese text-to-structure APIs for AI agents. Pay per call with USDC (x402).",
+      description: "Worldwide holidays / business days and Japanese text-to-structure APIs for AI agents. Pay per call with USDC (x402), no API key.",
       network: cfg.networkId,
       endpoints: ENDPOINTS.map((e) => ({ method: e.method, path: e.path, price: e.price, summary: e.summary })),
       openapi: `${cfg.PUBLIC_BASE_URL}/openapi.json`,
       wellKnown: `${cfg.PUBLIC_BASE_URL}/.well-known/x402`,
       attribution: [
+        "Worldwide holiday data: date-holidays (https://github.com/commenthol/date-holidays), CC-BY-3.0",
         "住所データ: デジタル庁 アドレス・ベース・レジストリ (via @geolonia/normalize-japanese-addresses)",
         "このサービスは、国税庁法人番号システムのWeb-API機能を利用して取得した情報をもとに作成しているが、サービスの内容は国税庁によって保証されたものではない",
       ],

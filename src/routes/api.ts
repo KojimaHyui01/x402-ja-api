@@ -16,6 +16,13 @@ import { HojinApiError, HojinClient, HojinParseError } from "../lib/hojin.js";
 import { NameInputError, parseName } from "../lib/name.js";
 import { RomajiInputError, kanaToRomaji, romanizeName } from "../lib/romaji.js";
 import { normalizeText } from "../lib/text.js";
+import {
+  WorldCalendarInputError,
+  addBusinessDaysIn,
+  describeDateIn,
+  holidaysFor,
+  type HolidayType,
+} from "../lib/world-calendar.js";
 
 const AddressBody = z.object({
   address: z.string().min(1).max(200),
@@ -60,6 +67,30 @@ const NameRomajiQuery = z.object({
   kana: z.string().min(1).max(100),
 });
 
+const HOLIDAY_TYPES = ["public", "bank", "school", "optional", "observance"] as const;
+
+const csv = (v: string): string[] => v.split(",").map((t) => t.trim()).filter((t) => t !== "");
+
+const WorldHolidaysQuery = z.object({
+  country: z.string().regex(/^[A-Za-z]{2}$/),
+  year: z.coerce.number().int().min(1900).max(2100),
+  region: z.string().max(10).optional(),
+  types: z.string().transform(csv).pipe(z.array(z.enum(HOLIDAY_TYPES)).min(1)).optional(),
+});
+
+const WorldBusinessDayQuery = z.object({
+  country: z.string().regex(/^[A-Za-z]{2}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  add: z.coerce.number().int().min(-2000).max(2000).default(0),
+  region: z.string().max(10).optional(),
+  weekend: z
+    .string()
+    .transform((v) => csv(v).map(Number))
+    .pipe(z.array(z.number().int().min(0).max(6)).max(6))
+    .optional(),
+  calendar: z.enum(["standard", "bank"]).default("standard"),
+});
+
 /** Today's date in Japan (UTC+9), as YYYY-MM-DD. */
 function todayJst(now = new Date()): string {
   return new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -102,6 +133,38 @@ function businessDayReport(date: string, add: number, calendar: CalendarKind) {
 /** Paid endpoints. Payment enforcement happens in middleware mounted before this router. */
 export function apiRouter(deps: ApiDeps): Router {
   const router = Router();
+
+  router.get("/v1/holidays", (req, res) => {
+    const q = parseQuery(WorldHolidaysQuery, req, res);
+    if (!q) return;
+    try {
+      const holidays = holidaysFor(q.country, q.year, { region: q.region, types: q.types as readonly HolidayType[] | undefined });
+      res.json({
+        country: q.country.toUpperCase(),
+        region: q.region?.toUpperCase() ?? null,
+        year: q.year,
+        count: holidays.length,
+        holidays,
+        source: "date-holidays (CC-BY-3.0)",
+      });
+    } catch (err) {
+      if (err instanceof WorldCalendarInputError) return badRequest(res, err.message);
+      throw err;
+    }
+  });
+
+  router.get("/v1/business-day", (req, res) => {
+    const q = parseQuery(WorldBusinessDayQuery, req, res);
+    if (!q) return;
+    try {
+      const date = q.date ?? new Date().toISOString().slice(0, 10);
+      const opts = { region: q.region, weekend: q.weekend, calendar: q.calendar };
+      res.json({ ...describeDateIn(q.country, date, opts), add: q.add, result: addBusinessDaysIn(q.country, date, q.add, opts) });
+    } catch (err) {
+      if (err instanceof WorldCalendarInputError) return badRequest(res, err.message);
+      throw err;
+    }
+  });
 
   router.get("/v1/jp/holidays", (req, res) => {
     const q = parseQuery(HolidaysQuery, req, res);

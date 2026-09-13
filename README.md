@@ -4,6 +4,9 @@
 
 | Endpoint | 価格 | 何をするか |
 |---|---|---|
+| `GET /v1/holidays?country=DE&year=2026&region=BY` | $0.005 | **200カ国以上**の祝日（州・地域別、英語名＋現地名、振替フラグ）。`date-holidays` データ |
+| `GET /v1/business-day?country=SA&date=&add=` | $0.005 | 任意の国の営業日計算（その国の週末＝金土/金/土 も考慮） |
+| `GET /v1/holidays/countries[?country=US]` | 無料 | 対応国一覧／地域コード一覧 |
 | `GET /v1/jp/holidays?year=2026` | $0.005 | 国民の祝日一覧（振替休日・国民の休日込み、内閣府公式CSV、1955〜） |
 | `GET /v1/jp/business-day?date=&add=&calendar=` | $0.005 | 営業日判定・N営業日後・月末営業日（`calendar=bank` で12/31〜1/3も休業扱い） |
 | `GET /v1/jp/bank/resolve?bank=&branch=` | $0.02 | 銀行名・支店名の揺れ→金融機関コード・支店コード（候補＋確信度、全銀用半角カナ付き。zengin-code 1,146機関/29,000支店） |
@@ -65,7 +68,8 @@ src/
   lib/address.ts       Geolonia 住所正規化のラッパー
   lib/csv.ts, hojin.ts 国税庁 Web-API v4 クライアント + CSV パーサ + チェックデジット
   lib/company.ts       名寄せ・ランキング
-  lib/calendar.ts      祝日・営業日計算（data/holidays.json を読む）
+  lib/calendar.ts      日本の祝日・営業日計算（data/holidays.json を読む）
+  lib/world-calendar.ts 世界の祝日・営業日（date-holidays、国別週末テーブル）
   lib/bank.ts          銀行・支店コード解決（zengin-code、表記揺れ・カナ・半角カナ）
   lib/romaji.ts        かな→ヘボン式ローマ字（パスポート規則）
   lib/name.ts          姓名分割・読み候補（data/names/dict.json）
@@ -87,6 +91,7 @@ scripts/
 - 法人番号データ利用時は「このサービスは国税庁法人番号システムWeb-API機能を利用して取得した情報をもとに作成しているが、サービスの内容は国税庁によって保証されたものではない」旨の表示が必要（`/` のレスポンスに追加予定）
 - 住所データは Geolonia（アドレス・ベース・レジストリ由来）。ライブラリの利用条件に従う
 - 祝日データは内閣府「国民の祝日」CSV（政府標準利用規約 v2.0、出典明記）
+- 世界の祝日は date-holidays（コードISC、データCC-BY-3.0、出典明記）
 - 銀行・支店データは zengin-code（MIT、公開情報から自動収集）。`npm update zengin-code` で追従
 - 人名辞書は mecab-ipadic（NAISTライセンス、`data/names/IPADIC-COPYING.txt`）と japanese-personal-name-dataset（MIT）由来
 

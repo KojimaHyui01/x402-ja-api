@@ -107,7 +107,82 @@ const NAME_ROMAJI_INPUT_SCHEMA = {
   required: ["kana"],
 } as const;
 
+const WORLD_HOLIDAYS_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    country: { type: "string", pattern: "^[A-Za-z]{2}$", description: "ISO 3166-1 alpha-2 country code (US, DE, GB, SG ...). GET /v1/holidays/countries lists all 200+" },
+    year: { type: "integer", minimum: 1900, maximum: 2100 },
+    region: { type: "string", maxLength: 10, description: "Optional subdivision (US-CA → CA, DE-BY → BY). GET /v1/holidays/countries?country=US lists them" },
+    types: { type: "string", description: "Comma-separated filter: public,bank,school,optional,observance (default: all)" },
+  },
+  required: ["country", "year"],
+} as const;
+
+const WORLD_BUSINESS_DAY_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    country: { type: "string", pattern: "^[A-Za-z]{2}$", description: "ISO 3166-1 alpha-2 country code" },
+    date: { type: "string", format: "date", description: "Base date YYYY-MM-DD (default: today UTC)" },
+    add: { type: "integer", minimum: -2000, maximum: 2000, default: 0, description: "Business days to add (negative = go back)" },
+    region: { type: "string", maxLength: 10, description: "Optional subdivision code" },
+    weekend: { type: "string", description: "Override weekend as weekday numbers, 0=Sunday (e.g. 5,6 for Fri-Sat). Default: the country's customary weekend" },
+    calendar: { type: "string", enum: ["standard", "bank"], default: "standard", description: "bank = also treat bank holidays as closed" },
+  },
+  required: ["country"],
+} as const;
+
 export const ENDPOINTS: readonly Endpoint[] = [
+  {
+    key: "GET /v1/holidays",
+    method: "GET",
+    path: "/v1/holidays",
+    kind: "query",
+    price: "$0.005",
+    summary: "Public holidays for any country (200+) and year",
+    description:
+      "One call, no API key: public/bank/school/observance holidays for 200+ countries with regional subdivisions (US states, German Länder, Canadian provinces ...), English and local names, substitute-day flags. Backed by the date-holidays dataset (CC-BY).",
+    tags: ["holidays", "calendar", "dates", "worldwide", "scheduling"],
+    input: { country: "DE", year: 2026, region: "BY", types: "public" },
+    inputSchema: WORLD_HOLIDAYS_INPUT_SCHEMA,
+    outputExample: {
+      country: "DE",
+      region: "BY",
+      year: 2026,
+      count: 14,
+      holidays: [
+        { date: "2026-01-01", name: "New Year's Day", localName: "Neujahr", type: "public", substitute: false },
+        { date: "2026-01-06", name: "Epiphany", localName: "Heilige Drei Könige", type: "public", substitute: false },
+      ],
+      source: "date-holidays (CC-BY-3.0)",
+    },
+  },
+  {
+    key: "GET /v1/business-day",
+    method: "GET",
+    path: "/v1/business-day",
+    kind: "query",
+    price: "$0.005",
+    summary: "Business-day calculator for any country",
+    description:
+      "Is this date a business day in country X? Add or subtract N business days honouring that country's public holidays, regional holidays and customary weekend (Fri-Sat in Saudi Arabia, Fri in Iran, Sat in Nepal ...). Ideal for due dates, SLAs and delivery estimates across borders.",
+    tags: ["business-days", "calendar", "dates", "worldwide", "scheduling", "sla", "finance"],
+    input: { country: "DE", date: "2026-12-24", add: 1 },
+    inputSchema: WORLD_BUSINESS_DAY_INPUT_SCHEMA,
+    outputExample: {
+      country: "DE",
+      region: null,
+      date: "2026-12-24",
+      weekday: "Thursday",
+      weekend: [6, 0],
+      isWeekend: false,
+      holidays: [],
+      isBusinessDay: true,
+      nextBusinessDay: "2026-12-28",
+      previousBusinessDay: "2026-12-23",
+      add: 1,
+      result: "2026-12-28",
+    },
+  },
   {
     key: "GET /v1/jp/holidays",
     method: "GET",

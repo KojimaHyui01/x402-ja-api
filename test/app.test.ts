@@ -32,7 +32,7 @@ describe("discovery documents", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.network).toBe("eip155:84532");
-    expect(r.body.endpoints).toBe(9);
+    expect(r.body.endpoints).toBe(11);
   });
 
   it("serves an OpenAPI doc with x-payment-info on every operation", async () => {
@@ -82,6 +82,29 @@ describe("handlers (paywall disabled)", () => {
     expect(r.status).toBe(200);
     expect(r.body.normalized).toBe("2019-04-30 TEL 090-1234-5678");
     expect(r.body.phones[0].e164).toBe("+819012345678");
+  });
+
+  it("GET /v1/holidays and /v1/business-day work worldwide", async () => {
+    const h = await request(app).get("/v1/holidays?country=de&year=2026&region=by&types=public");
+    expect(h.status).toBe(200);
+    expect(h.body.country).toBe("DE");
+    expect(h.body.holidays[0]).toMatchObject({ date: "2026-01-01", name: "New Year's Day", type: "public" });
+    expect((await request(app).get("/v1/holidays?country=XX&year=2026")).status).toBe(400);
+    expect((await request(app).get("/v1/holidays?country=DE&year=2026&types=nope")).status).toBe(400);
+    const b = await request(app).get("/v1/business-day?country=SA&date=2026-09-17&add=1");
+    expect(b.body.result).toBe("2026-09-20");
+    expect(b.body.weekend).toEqual([5, 6]);
+    const w = await request(app).get("/v1/business-day?country=DE&date=2026-09-17&add=1&weekend=5,6");
+    expect(w.body.result).toBe("2026-09-20");
+  });
+
+  it("GET /v1/holidays/countries is free reference data", async () => {
+    const c = await request(app).get("/v1/holidays/countries");
+    expect(c.status).toBe(200);
+    expect(c.body.count).toBeGreaterThan(180);
+    const r = await request(app).get("/v1/holidays/countries?country=US");
+    expect(r.body.regions.length).toBeGreaterThan(50);
+    expect((await request(app).get("/v1/holidays/countries?country=XX")).status).toBe(400);
   });
 
   it("GET /v1/jp/holidays lists a year", async () => {
@@ -206,5 +229,6 @@ describe("paywall (x402 challenge against a stub facilitator)", () => {
   it("discovery routes stay free", async () => {
     expect((await request(app).get("/openapi.json")).status).toBe(200);
     expect((await request(app).get("/health")).status).toBe(200);
+    expect((await request(app).get("/v1/holidays/countries")).status).toBe(200);
   });
 });
