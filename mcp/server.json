@@ -4,13 +4,13 @@
   "description": "Worldwide holidays & business days (200+ countries) and Japanese address/name/bank/company normalization for agents. Free daily quota; optional x402 USDC payments.",
   "status": "active",
   "repository": { "url": "https://github.com/KojimaHyui01/x402-ja-api", "source": "github" },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packages": [
     {
       "registry_type": "npm",
       "registry_base_url": "https://registry.npmjs.org",
       "identifier": "ja-normalize-mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": { "type": "stdio" },
       "environment_variables": [
         { "name": "X402_PRIVATE_KEY", "description": "Optional: Base wallet private key holding USDC for paid calls beyond the free quota", "is_required": false, "is_secret": true }
