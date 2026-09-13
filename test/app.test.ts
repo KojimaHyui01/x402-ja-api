@@ -64,11 +64,16 @@ describe("discovery documents", () => {
     expect(r.text).toContain(`x402-pay-to: ${TEST_ENV.PAY_TO_ADDRESS}`);
   });
 
-  it("serves /.well-known/x402 with absolute resource URLs", async () => {
+  it("serves /.well-known/x402 with absolute resource URLs and agent instructions", async () => {
     const r = await request(app).get("/.well-known/x402");
     expect(r.status).toBe(200);
     expect(r.body.resources).toContain("https://example.test/v1/text/normalize");
     expect(r.body.ownershipProofs).toEqual([TEST_ENV.PAY_TO_ADDRESS]);
+    expect(r.body.instructions).toContain("GET /v1/business-day");
+    expect(r.body.instructions).toContain("free calls per UTC day");
+    const l = await request(app).get("/llms.txt");
+    expect(l.status).toBe(200);
+    expect(l.text).toContain("## Endpoints");
   });
 });
 
@@ -207,8 +212,25 @@ const stubFacilitator: FacilitatorClient = {
   settle: async () => ({ success: false, errorReason: "stub", transaction: "", network: "eip155:84532" }),
 };
 
+describe("free quota (try before you pay)", () => {
+  const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator, freeQuotaPerDay: 2 });
+
+  it("grants N free calls per IP, then 402", async () => {
+    const ip = "203.0.113.7";
+    const a = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip);
+    expect(a.status).toBe(200);
+    const b = await request(app).get("/v1/jp/name/romaji?kana=%E3%81%95%E3%81%A8%E3%81%86").set("X-Forwarded-For", ip);
+    expect(b.status).toBe(200);
+    const c = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", ip);
+    expect(c.status).toBe(402);
+    // a different IP has its own quota
+    const d = await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "198.51.100.9");
+    expect(d.status).toBe(200);
+  });
+});
+
 describe("paywall (x402 challenge against a stub facilitator)", () => {
-  const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator });
+  const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator, freeQuotaPerDay: 0 });
 
   it("unpaid GET returns 402 too ($0.005 = 5000 micro-USDC)", async () => {
     const r = await request(app).get("/v1/jp/holidays?year=2026");

@@ -23,6 +23,8 @@ const EnvSchema = z.object({
   CDP_API_KEY_ID: z.string().min(1).optional(),
   CDP_API_KEY_SECRET: z.string().min(1).optional(),
   HOJIN_APP_ID: z.string().min(1).optional(),
+  /** Free paid-route calls per client IP per UTC day (try-before-you-pay). 0 disables. */
+  FREE_QUOTA_PER_DAY: z.coerce.number().int().min(0).max(1000).default(20),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

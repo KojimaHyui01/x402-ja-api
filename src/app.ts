@@ -1,10 +1,11 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
-import type { FacilitatorClient } from "@x402/core/server";
-import { paymentMiddleware } from "@x402/express";
+import { x402HTTPResourceServer, type FacilitatorClient } from "@x402/core/server";
+import { paymentMiddlewareFromHTTPServer } from "@x402/express";
 import type { Config } from "./config.js";
 import { HojinClient } from "./lib/hojin.js";
 import { apiRouter } from "./routes/api.js";
 import { discoveryRouter } from "./routes/discovery.js";
+import { createFreeQuota } from "./x402/free-quota.js";
 import { buildResourceServer, buildRoutes } from "./x402/server.js";
 
 export interface AppOptions {
@@ -12,6 +13,8 @@ export interface AppOptions {
   paywall?: boolean;
   /** Override the facilitator (tests inject a stub). Defaults to testnet x402.org or Coinbase CDP. */
   facilitator?: FacilitatorClient;
+  /** Free paid-route calls per client IP per day before the 402 applies (default from config). */
+  freeQuotaPerDay?: number;
 }
 
 function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
@@ -41,7 +44,9 @@ export function createApp(cfg: Config, opts: AppOptions = {}): Express {
 
   if (opts.paywall !== false) {
     const server = buildResourceServer(cfg, opts.facilitator);
-    app.use(paymentMiddleware(buildRoutes(cfg), server));
+    const quota = createFreeQuota({ perDay: opts.freeQuotaPerDay ?? cfg.FREE_QUOTA_PER_DAY });
+    const httpServer = new x402HTTPResourceServer(server, buildRoutes(cfg)).onProtectedRequest(quota.hook);
+    app.use(paymentMiddlewareFromHTTPServer(httpServer));
   }
 
   const hojin = cfg.HOJIN_APP_ID ? new HojinClient(cfg.HOJIN_APP_ID) : null;

@@ -86,6 +86,42 @@ export function buildOpenApi(cfg: Config): Record<string, unknown> {
   };
 }
 
+const EOL = String.fromCharCode(10);
+
+function exampleUrl(cfg: Config, e: Endpoint): string {
+  if (e.kind === "body") return `POST ${cfg.PUBLIC_BASE_URL}${e.path}  body: ${JSON.stringify(e.input)}`;
+  const qs = new URLSearchParams(Object.entries(e.input).map(([k, v]) => [k, String(v)])).toString();
+  return `GET ${cfg.PUBLIC_BASE_URL}${e.path}?${qs}`;
+}
+
+/** Agent-facing usage notes (served in /.well-known/x402 `instructions` and /llms.txt). */
+export function buildInstructions(cfg: Config): string {
+  const lines = [
+    `# ${cfg.SERVICE_NAME}`,
+    "",
+    "Calendar and Japan data for AI agents. No API key, no signup. Pay per call in USDC on Base via x402 (HTTP 402).",
+    `Try before you pay: each client IP gets ${cfg.FREE_QUOTA_PER_DAY} free calls per UTC day; after that a 402 challenge is returned.`,
+    "",
+    "## How to call",
+    "1. Send the request. If you are within the free quota you get 200 immediately.",
+    "2. Otherwise you get HTTP 402 with a `PAYMENT-REQUIRED` header (base64 JSON, x402 v2, scheme `exact`, USDC on eip155:8453).",
+    "3. Sign the payment (any x402 client: @x402/fetch, x402-axios, Coinbase AgentKit ...) and retry with the payment header. The response carries `PAYMENT-RESPONSE` as the receipt.",
+    "Every 402 also carries a Bazaar discovery extension with the input schema and an output example.",
+    "",
+    "## Endpoints",
+    ...ENDPOINTS.flatMap((e) => [`### ${e.method} ${e.path} — ${e.price}`, e.summary, `Example: ${exampleUrl(cfg, e)}`, ""]),
+    "### GET /v1/holidays/countries — free",
+    "Lists supported country codes; `?country=US` lists that country's regions.",
+    "",
+    "## Notes",
+    "- Dates are ISO YYYY-MM-DD; business-day math never depends on the caller's timezone.",
+    "- Japanese endpoints accept any notation (full/half-width, kana, romaji, with or without 銀行/支店).",
+    "- `confident: false` or `confidence: \"low\"` means the result is a ranked guess — prefer passing more context (e.g. `kana`).",
+    `- Machine docs: ${cfg.PUBLIC_BASE_URL}/openapi.json  Contact: ${cfg.CONTACT_EMAIL}`,
+  ];
+  return `${lines.join(EOL)}${EOL}`;
+}
+
 export function buildWellKnown(cfg: Config): Record<string, unknown> {
   return {
     version: 1,
@@ -94,10 +130,10 @@ export function buildWellKnown(cfg: Config): Record<string, unknown> {
     resources: ENDPOINTS.map((e) => `${cfg.PUBLIC_BASE_URL}${e.path}`),
     ownershipProofs: [cfg.PAY_TO_ADDRESS],
     openapi: `${cfg.PUBLIC_BASE_URL}/openapi.json`,
+    freeQuotaPerDay: cfg.FREE_QUOTA_PER_DAY,
+    instructions: buildInstructions(cfg),
   };
 }
-
-const EOL = String.fromCharCode(10);
 
 /** x402Relay manifest scanner format (https://docs.x402-relay.com/providers/register/). */
 export function buildAiTxt(cfg: Config): string {
@@ -147,6 +183,8 @@ export function discoveryRouter(cfg: Config): Router {
   router.get(["/.well-known/x402", "/.well-known/x402.json"], (_req, res) => res.json(wellKnown));
   const aiTxt = buildAiTxt(cfg);
   router.get("/.well-known/ai.txt", (_req, res) => res.type("text/plain").send(aiTxt));
+  const instructions = buildInstructions(cfg);
+  router.get("/llms.txt", (_req, res) => res.type("text/markdown").send(instructions));
   router.get("/", (_req, res) => {
     res.json({
       service: cfg.SERVICE_NAME,
@@ -155,6 +193,8 @@ export function discoveryRouter(cfg: Config): Router {
       endpoints: ENDPOINTS.map((e) => ({ method: e.method, path: e.path, price: e.price, summary: e.summary })),
       openapi: `${cfg.PUBLIC_BASE_URL}/openapi.json`,
       wellKnown: `${cfg.PUBLIC_BASE_URL}/.well-known/x402`,
+      llms: `${cfg.PUBLIC_BASE_URL}/llms.txt`,
+      freeQuotaPerDay: cfg.FREE_QUOTA_PER_DAY,
       attribution: [
         "Worldwide holiday data: date-holidays (https://github.com/commenthol/date-holidays), CC-BY-3.0",
         "住所データ: デジタル庁 アドレス・ベース・レジストリ (via @geolonia/normalize-japanese-addresses)",
