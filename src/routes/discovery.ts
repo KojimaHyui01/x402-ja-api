@@ -79,7 +79,6 @@ export function buildOpenApi(cfg: Config): Record<string, unknown> {
           security: [], // no payment — tells x402scan not to probe this for a 402
           parameters: [{ name: "country", in: "query", required: false, schema: { type: "string" }, example: "US" }],
           responses: { "200": { description: "OK" } },
-          "x-payment-info": { protocol: "x402", price: "$0", note: "free reference endpoint" },
         },
       },
     },
