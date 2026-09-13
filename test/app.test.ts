@@ -32,7 +32,7 @@ describe("discovery documents", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.network).toBe("eip155:84532");
-    expect(r.body.endpoints).toBe(11);
+    expect(r.body.endpoints).toBe(12);
   });
 
   it("serves an OpenAPI doc with x-payment-info on every operation", async () => {
@@ -105,6 +105,10 @@ describe("handlers (paywall disabled)", () => {
     const r = await request(app).get("/v1/holidays/countries?country=US");
     expect(r.body.regions.length).toBeGreaterThan(50);
     expect((await request(app).get("/v1/holidays/countries?country=XX")).status).toBe(400);
+  });
+
+  it("GET /v1/jp/crypto/ticker validates the symbol", async () => {
+    expect((await request(app).get("/v1/jp/crypto/ticker?symbol=DOGE")).status).toBe(400);
   });
 
   it("GET /v1/jp/holidays lists a year", async () => {

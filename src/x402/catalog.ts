@@ -184,6 +184,41 @@ export const ENDPOINTS: readonly Endpoint[] = [
     },
   },
   {
+    key: "GET /v1/jp/crypto/ticker",
+    method: "GET",
+    path: "/v1/jp/crypto/ticker",
+    kind: "query",
+    price: "$0.005",
+    summary: "JPY crypto prices across Japanese exchanges + JPY premium vs USD",
+    description:
+      "One call: BTC/ETH/XRP prices in JPY from bitFlyer, Coincheck, GMO Coin and bitbank (last/bid/ask/volume), the cross-exchange median and dispersion, a USD reference (Coinbase, Kraken fallback), USD/JPY, the crypto-implied USD/JPY, and the Japan premium/discount as a fraction. Partial-failure tolerant; cached 10 s.",
+    tags: ["japan", "crypto", "bitcoin", "jpy", "premium", "arbitrage", "market-data", "finance"],
+    input: { symbol: "BTC" },
+    inputSchema: {
+      type: "object",
+      properties: { symbol: { type: "string", enum: ["BTC", "ETH", "XRP"], default: "BTC" } },
+    },
+    outputExample: {
+      symbol: "BTC",
+      asOf: "2026-09-13T05:52:15.000Z",
+      jpy: {
+        quotes: [
+          { exchange: "bitflyer", pair: "BTC_JPY", last: 11873368, bid: 11873000, ask: 11874000, volume24h: 1000, timestamp: "2026-09-13T05:52:14.97" },
+          { exchange: "coincheck", pair: "btc_jpy", last: 11876006, bid: 11875000, ask: 11877000, volume24h: 500, timestamp: "2026-09-13T05:52:10.000Z" },
+        ],
+        median: 11878483,
+        min: 11873368,
+        max: 11884688,
+        dispersion: 0.000953,
+      },
+      usd: { price: 77280, source: "coinbase" },
+      fx: { usdJpy: 153.8, source: "open.er-api.com", asOf: "Sun, 13 Sep 2026 00:02:31 +0000" },
+      impliedUsdJpy: 153.7,
+      premium: -0.000634,
+      errors: [],
+    },
+  },
+  {
     key: "GET /v1/jp/holidays",
     method: "GET",
     path: "/v1/jp/holidays",

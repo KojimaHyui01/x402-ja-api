@@ -13,6 +13,7 @@ import {
 } from "../lib/calendar.js";
 import { CompanyInputError, resolveCompany } from "../lib/company.js";
 import { HojinApiError, HojinClient, HojinParseError } from "../lib/hojin.js";
+import { CryptoInputError, UpstreamError, jpySnapshot, parseSymbol } from "../lib/jpy-crypto.js";
 import { NameInputError, parseName } from "../lib/name.js";
 import { RomajiInputError, kanaToRomaji, romanizeName } from "../lib/romaji.js";
 import { normalizeText } from "../lib/text.js";
@@ -56,6 +57,10 @@ const BankResolveQuery = z.object({
 const BankLookupQuery = z.object({
   bankCode: z.string().regex(/^\d{4}$/),
   branchCode: z.string().regex(/^\d{3}$/).optional(),
+});
+
+const CryptoTickerQuery = z.object({
+  symbol: z.string().min(2).max(5).default("BTC"),
 });
 
 const NameParseQuery = z.object({
@@ -163,6 +168,22 @@ export function apiRouter(deps: ApiDeps): Router {
     } catch (err) {
       if (err instanceof WorldCalendarInputError) return badRequest(res, err.message);
       throw err;
+    }
+  });
+
+  router.get("/v1/jp/crypto/ticker", async (req, res, next) => {
+    const q = parseQuery(CryptoTickerQuery, req, res);
+    if (!q) return;
+    try {
+      res.set("Cache-Control", "no-store");
+      res.json(await jpySnapshot(parseSymbol(q.symbol)));
+    } catch (err) {
+      if (err instanceof CryptoInputError) return badRequest(res, err.message);
+      if (err instanceof UpstreamError) {
+        res.status(502).json({ error: "upstream_error", message: err.message });
+        return;
+      }
+      next(err);
     }
   });
 

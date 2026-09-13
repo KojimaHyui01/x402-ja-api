@@ -7,6 +7,7 @@
 | `GET /v1/holidays?country=DE&year=2026&region=BY` | $0.005 | **200カ国以上**の祝日（州・地域別、英語名＋現地名、振替フラグ）。`date-holidays` データ |
 | `GET /v1/business-day?country=SA&date=&add=` | $0.005 | 任意の国の営業日計算（その国の週末＝金土/金/土 も考慮） |
 | `GET /v1/holidays/countries[?country=US]` | 無料 | 対応国一覧／地域コード一覧 |
+| `GET /v1/jp/crypto/ticker?symbol=BTC` | $0.005 | bitFlyer/Coincheck/GMO/bitbank のJPY価格、中央値・乖離、USD参照、USD/JPY、**円プレミアム**（対USD乖離率）。10秒キャッシュ |
 | `GET /v1/jp/holidays?year=2026` | $0.005 | 国民の祝日一覧（振替休日・国民の休日込み、内閣府公式CSV、1955〜） |
 | `GET /v1/jp/business-day?date=&add=&calendar=` | $0.005 | 営業日判定・N営業日後・月末営業日（`calendar=bank` で12/31〜1/3も休業扱い） |
 | `GET /v1/jp/bank/resolve?bank=&branch=` | $0.02 | 銀行名・支店名の揺れ→金融機関コード・支店コード（候補＋確信度、全銀用半角カナ付き。zengin-code 1,146機関/29,000支店） |
@@ -70,6 +71,7 @@ src/
   lib/company.ts       名寄せ・ランキング
   lib/calendar.ts      日本の祝日・営業日計算（data/holidays.json を読む）
   lib/world-calendar.ts 世界の祝日・営業日（date-holidays、国別週末テーブル）
+  lib/jpy-crypto.ts    国内取引所のJPY価格集約＋円プレミアム（公開API、部分失敗許容）
   lib/bank.ts          銀行・支店コード解決（zengin-code、表記揺れ・カナ・半角カナ）
   lib/romaji.ts        かな→ヘボン式ローマ字（パスポート規則）
   lib/name.ts          姓名分割・読み候補（data/names/dict.json）
