@@ -1,19 +1,28 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.KojimaHyui01/ja-normalize",
-  "description": "Worldwide holidays & business days (200+ countries) and Japanese address/name/bank/company normalization for agents. Free daily quota; optional x402 USDC payments.",
-  "status": "active",
-  "repository": { "url": "https://github.com/KojimaHyui01/x402-ja-api", "source": "github" },
+  "description": "Holidays/business days for 200+ countries; Japanese address, name, bank and company normalization.",
+  "repository": {
+    "url": "https://github.com/KojimaHyui01/x402-ja-api",
+    "source": "github"
+  },
   "version": "0.1.2",
   "packages": [
     {
-      "registry_type": "npm",
-      "registry_base_url": "https://registry.npmjs.org",
+      "registryType": "npm",
       "identifier": "ja-normalize-mcp",
       "version": "0.1.2",
-      "transport": { "type": "stdio" },
-      "environment_variables": [
-        { "name": "X402_PRIVATE_KEY", "description": "Optional: Base wallet private key holding USDC for paid calls beyond the free quota", "is_required": false, "is_secret": true }
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "X402_PRIVATE_KEY",
+          "description": "Optional: Base wallet private key holding USDC for paid calls beyond the free daily quota",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        }
       ]
     }
   ]
