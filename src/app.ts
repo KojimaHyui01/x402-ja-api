@@ -5,7 +5,9 @@ import type { Config } from "./config.js";
 import { HojinClient } from "./lib/hojin.js";
 import { apiRouter } from "./routes/api.js";
 import { discoveryRouter } from "./routes/discovery.js";
+import { statsRouter } from "./routes/stats.js";
 import { createFreeQuota } from "./x402/free-quota.js";
+import { Metrics } from "./x402/metrics.js";
 import { buildResourceServer, buildRoutes } from "./x402/server.js";
 
 export interface AppOptions {
@@ -42,10 +44,14 @@ export function createApp(cfg: Config, opts: AppOptions = {}): Express {
 
   app.use(discoveryRouter(cfg));
 
+  const metrics = new Metrics();
+  app.use(statsRouter(cfg, metrics));
+
   if (opts.paywall !== false) {
     const server = buildResourceServer(cfg, opts.facilitator);
+    metrics.attachTo(server);
     const quota = createFreeQuota({ perDay: opts.freeQuotaPerDay ?? cfg.FREE_QUOTA_PER_DAY });
-    const httpServer = new x402HTTPResourceServer(server, buildRoutes(cfg)).onProtectedRequest(quota.hook);
+    const httpServer = new x402HTTPResourceServer(server, buildRoutes(cfg)).onProtectedRequest(metrics.observeProtectedRequests(quota.hook));
     app.use(paymentMiddlewareFromHTTPServer(httpServer));
   }
 

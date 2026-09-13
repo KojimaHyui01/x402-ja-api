@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run typecheck && npm test",
     "doctor": "tsx scripts/doctor.ts",
-    "probe": "tsx scripts/probe.ts"
+    "probe": "tsx scripts/probe.ts",
+    "stats": "curl -s https://x402-ja-api.onrender.com/stats?format=json"
   },
   "keywords": [],
   "author": "",

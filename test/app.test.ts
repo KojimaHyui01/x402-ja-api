@@ -231,6 +231,26 @@ describe("free quota (try before you pay)", () => {
   });
 });
 
+describe("/stats", () => {
+  const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator, freeQuotaPerDay: 5 });
+
+  it("counts free grants and 402 challenges per route and serves JSON or HTML", async () => {
+    await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "203.0.113.50").set("X-Free-Tier", "1");
+    await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "203.0.113.51");
+    const j = await request(app).get("/stats?format=json");
+    expect(j.status).toBe(200);
+    expect(j.body.payTo).toBe(TEST_ENV.PAY_TO_ADDRESS);
+    const route = j.body.sinceBoot.routes["GET /v1/jp/holidays"];
+    expect(route.free).toBe(1);
+    expect(route.challenged).toBe(1);
+    expect(route.paid).toBe(0);
+    const h = await request(app).get("/stats").set("Accept", "text/html");
+    expect(h.status).toBe(200);
+    expect(h.headers["content-type"]).toMatch(/text\/html/);
+    expect(h.text).toContain("売上ダッシュボード");
+  }, 30_000);
+});
+
 describe("paywall (x402 challenge against a stub facilitator)", () => {
   const app = createApp(cfg, { paywall: true, facilitator: stubFacilitator, freeQuotaPerDay: 0 });
 
