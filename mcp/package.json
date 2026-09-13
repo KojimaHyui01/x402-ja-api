@@ -1,0 +1,47 @@
+{
+  "name": "ja-normalize-mcp",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "japan",
+    "holidays",
+    "business-days",
+    "x402"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "MCP server for ja-normalize: worldwide holidays/business days and Japanese address/name/bank normalization. Free daily quota; optional x402 USDC payments.",
+  "type": "module",
+  "bin": {
+    "ja-normalize-mcp": "dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KojimaHyui01/x402-ja-api"
+  },
+  "homepage": "https://x402-ja-api.onrender.com",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@x402/core": "^2.25.0",
+    "@x402/evm": "^2.25.0",
+    "@x402/fetch": "^2.25.0",
+    "viem": "^2.56.5",
+    "zod": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2"
+  }
+}
