@@ -1,12 +1,16 @@
 import { Router } from "express";
 import type { Config } from "../config.js";
 import { fetchEarnings, type Earnings } from "../lib/earnings.js";
+import { authorizeStats } from "../lib/stats-auth.js";
 import type { Metrics, MetricsSnapshot } from "../x402/metrics.js";
 
 /**
  * GET /stats — one-page answer to "did anyone pay, and how much?"
  * JSON for machines; a small HTML dashboard when a browser asks (Accept: text/html).
- * Free and public: everything here is already visible on-chain.
+ *
+ * Operator-only: guarded by STATS_TOKEN (see lib/stats-auth.ts). The on-chain figures are public
+ * anyway, but the per-route traffic breakdown describes other people's use of the service, so the
+ * route stays closed unless the secret is configured and presented.
  */
 
 interface Stats {
@@ -68,6 +72,20 @@ ${routeRows ? `<table><tr><th>ルート</th><th>paid</th><th>paid USDC</th><th>f
 export function statsRouter(cfg: Config, metrics: Metrics): Router {
   const router = Router();
   router.get("/stats", async (req, res) => {
+    const auth = authorizeStats(req, cfg.STATS_TOKEN);
+    if (auth === "unconfigured") {
+      res.status(503).json({
+        error: "stats_disabled",
+        message: "STATS_TOKEN is not configured, so the dashboard is disabled.",
+      });
+      return;
+    }
+    if (auth === "denied") {
+      res.set("WWW-Authenticate", 'Basic realm="ja-normalize stats", charset="UTF-8"');
+      res.status(401).json({ error: "unauthorized", message: "Present STATS_TOKEN to read /stats." });
+      return;
+    }
+
     let earnings: Stats["earnings"];
     try {
       earnings = await fetchEarnings(cfg.PAY_TO_ADDRESS);

@@ -4,11 +4,14 @@ import type { FacilitatorClient } from "@x402/core/server";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 
+const STATS_TOKEN = "test-stats-token-0123456789";
+
 const TEST_ENV = {
   PAY_TO_ADDRESS: "0x1111111111111111111111111111111111111111",
   X402_NETWORK: "base-sepolia",
   PUBLIC_BASE_URL: "https://example.test",
   SERVICE_NAME: "ja-normalize-test",
+  STATS_TOKEN,
 };
 
 const cfg = loadConfig(TEST_ENV);
@@ -237,14 +240,14 @@ describe("/stats", () => {
   it("counts free grants and 402 challenges per route and serves JSON or HTML", async () => {
     await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "203.0.113.50").set("X-Free-Tier", "1");
     await request(app).get("/v1/jp/holidays?year=2026").set("X-Forwarded-For", "203.0.113.51");
-    const j = await request(app).get("/stats?format=json");
+    const j = await request(app).get("/stats?format=json").auth(STATS_TOKEN, { type: "bearer" });
     expect(j.status).toBe(200);
     expect(j.body.payTo).toBe(TEST_ENV.PAY_TO_ADDRESS);
     const route = j.body.sinceBoot.routes["GET /v1/jp/holidays"];
     expect(route.free).toBe(1);
     expect(route.challenged).toBe(1);
     expect(route.paid).toBe(0);
-    const h = await request(app).get("/stats").set("Accept", "text/html");
+    const h = await request(app).get("/stats").set("Accept", "text/html").auth(STATS_TOKEN, { type: "bearer" });
     expect(h.status).toBe(200);
     expect(h.headers["content-type"]).toMatch(/text\/html/);
     expect(h.text).toContain("売上ダッシュボード");

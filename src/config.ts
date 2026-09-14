@@ -25,6 +25,8 @@ const EnvSchema = z.object({
   HOJIN_APP_ID: z.string().min(1).optional(),
   /** Free paid-route calls per client IP per UTC day (try-before-you-pay). 0 disables. */
   FREE_QUOTA_PER_DAY: z.coerce.number().int().min(0).max(1000).default(20),
+  /** Shared secret guarding /stats. Unset = the dashboard is disabled rather than public. */
+  STATS_TOKEN: z.string().min(16, "must be at least 16 characters").optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

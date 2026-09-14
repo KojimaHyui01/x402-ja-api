@@ -20,7 +20,7 @@
 
 無料で読めるもの: `GET /` `GET /health` `GET /openapi.json` `GET /.well-known/x402` `GET /llms.txt` `GET /v1/holidays/countries`
 
-**売上ダッシュボード**: https://x402-ja-api.onrender.com/stats — 累計受取USDC・件数・支払元数・日別・直近入金（オンチェーン、Blockscout）＋起動後のエンドポイント別 paid/free/402 カウンタ。`?format=json` で機械向け。
+**売上ダッシュボード**（運営者専用 / `STATS_TOKEN` 必須）: https://x402-ja-api.onrender.com/stats — 累計受取USDC・件数・支払元数・日別・直近入金（オンチェーン、Blockscout）＋起動後のエンドポイント別 paid/free/402 カウンタ。`?format=json` で機械向け。
 
 ## 動かす
 
