@@ -3,6 +3,7 @@ import { x402HTTPResourceServer, type FacilitatorClient } from "@x402/core/serve
 import { paymentMiddlewareFromHTTPServer } from "@x402/express";
 import type { Config } from "./config.js";
 import { HojinClient } from "./lib/hojin.js";
+import { Visitors } from "./lib/visitors.js";
 import { apiRouter } from "./routes/api.js";
 import { discoveryRouter } from "./routes/discovery.js";
 import { statsRouter } from "./routes/stats.js";
@@ -42,10 +43,14 @@ export function createApp(cfg: Config, opts: AppOptions = {}): Express {
   });
   app.options("*splat", (_req, res) => res.sendStatus(204));
 
+  // Before the routers, so crawlers that only read the discovery documents are counted too.
+  const visitors = new Visitors(cfg.CLIENT_ID_SALT);
+  app.use(visitors.middleware());
+
   app.use(discoveryRouter(cfg));
 
   const metrics = new Metrics();
-  app.use(statsRouter(cfg, metrics));
+  app.use(statsRouter(cfg, metrics, visitors));
 
   if (opts.paywall !== false) {
     const server = buildResourceServer(cfg, opts.facilitator);

@@ -27,6 +27,8 @@ const EnvSchema = z.object({
   FREE_QUOTA_PER_DAY: z.coerce.number().int().min(0).max(1000).default(20),
   /** Shared secret guarding /stats. Unset = the dashboard is disabled rather than public. */
   STATS_TOKEN: z.string().min(16, "must be at least 16 characters").optional(),
+  /** Salt for visitor ids. Fixed = ids stay comparable across deploys; unset = fresh ids each boot. */
+  CLIENT_ID_SALT: z.string().min(8).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

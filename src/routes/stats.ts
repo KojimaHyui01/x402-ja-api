@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Config } from "../config.js";
 import { fetchEarnings, type Earnings } from "../lib/earnings.js";
 import { authorizeStats } from "../lib/stats-auth.js";
+import type { Visitors, VisitorSnapshot } from "../lib/visitors.js";
 import type { Metrics, MetricsSnapshot } from "../x402/metrics.js";
 
 /**
@@ -18,6 +19,7 @@ interface Stats {
   payTo: string;
   earnings: Earnings | { error: string };
   sinceBoot: MetricsSnapshot;
+  visitors: VisitorSnapshot;
   links: { basescan: string; x402scan: string };
 }
 
@@ -32,6 +34,7 @@ const usd = (n: number): string => `$${n.toFixed(n < 1 ? 4 : 2)}`;
 function renderHtml(s: Stats): string {
   const e = "error" in s.earnings ? null : s.earnings;
   const m = s.sinceBoot;
+  const v = s.visitors;
   const big = (label: string, value: string, sub = "") =>
     `<div class="card"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div><div class="sub">${esc(sub)}</div></div>`;
   const rows = (e?.latest ?? [])
@@ -41,6 +44,17 @@ function renderHtml(s: Stats): string {
     .map(([route, c]) => `<tr><td class="mono">${esc(route)}</td><td>${c.paid}</td><td>${esc(usd(c.paidMicroUsdc / 1e6))}</td><td>${c.free}</td><td>${c.challenged}</td></tr>`)
     .join("");
   const days = (e?.byDay ?? []).slice(0, 14).map((d) => `<tr><td>${esc(d.day)}</td><td>${d.count}</td><td>${esc(usd(d.usdc))}</td></tr>`).join("");
+  const short = (iso: string): string => iso.replace("T", " ").slice(5, 16);
+  const visitorRows = v.clients
+    .map(
+      (c) =>
+        `<tr><td class="mono">${esc(c.id)}</td><td>${esc(c.class)}</td><td>${c.requests}</td><td>${c.routes.length}</td><td>${c.paid}</td><td>${c.free}</td><td>${c.challenged}</td><td>${esc(short(c.first))}</td><td>${esc(short(c.last))}</td><td class="mono">${esc(c.ua.slice(0, 60))}</td></tr>`,
+    )
+    .join("");
+  const classSummary = Object.entries(v.byClass)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${k} ${n}`)
+    .join(" · ");
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.service)} — 売上</title>
 <style>
 body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;padding:24px;background:#0f1320;color:#e8ecf5}
@@ -66,10 +80,14 @@ ${days ? `<table><tr><th>日</th><th>件数</th><th>金額</th></tr>${days}</tab
 <h2>エンドポイント別（サーバー起動 ${esc(m.since.replace("T", " ").slice(0, 16))} UTC 以降）</h2>
 <div class="muted">paid = 決済成立、free = 無料枠、402 = 未払いで止まった（巡回ボット含む）</div>
 ${routeRows ? `<table><tr><th>ルート</th><th>paid</th><th>paid USDC</th><th>free</th><th>402</th></tr>${routeRows}</table>` : `<p class="muted">起動後のアクセスはまだありません。</p>`}
+<h2>訪問者（ユニーク ${v.unique}）</h2>
+<div class="muted">${esc(classSummary)}</div>
+<div class="muted">paying=決済済 / docs-reader=X-Free-Tierを送った（説明を読んだ証拠） / crawler=ボットUA・UA無し・多ルート巡回 / tool=汎用HTTPクライアント / browser=ブラウザ</div>
+${visitorRows ? `<table><tr><th>ID</th><th>種別</th><th>req</th><th>ルート数</th><th>paid</th><th>free</th><th>402</th><th>初回 (UTC)</th><th>最終 (UTC)</th><th>User-Agent</th></tr>${visitorRows}</table>` : `<p class="muted">起動後の訪問者はまだいません。</p>`}
 </body></html>`;
 }
 
-export function statsRouter(cfg: Config, metrics: Metrics): Router {
+export function statsRouter(cfg: Config, metrics: Metrics, visitors: Visitors): Router {
   const router = Router();
   router.get("/stats", async (req, res) => {
     const auth = authorizeStats(req, cfg.STATS_TOKEN);
@@ -97,6 +115,7 @@ export function statsRouter(cfg: Config, metrics: Metrics): Router {
       payTo: cfg.PAY_TO_ADDRESS,
       earnings,
       sinceBoot: metrics.snapshot(),
+      visitors: visitors.snapshot(),
       links: { basescan: `https://basescan.org/address/${cfg.PAY_TO_ADDRESS}#tokentxns`, x402scan: X402SCAN_PAGE },
     };
     res.set("Cache-Control", "no-store");
