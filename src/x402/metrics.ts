@@ -1,5 +1,6 @@
 import type { x402ResourceServer } from "@x402/core/server";
 import type { ProtectedRequestHook } from "@x402/core/server";
+import { findEndpointByPath } from "./catalog.js";
 
 /**
  * In-process counters since boot: per-route free-tier grants, 402 challenges, and settled payments
@@ -83,12 +84,18 @@ export class Metrics {
   }
 }
 
+/**
+ * Settlement receipts identify the resource by URL, while challenges are counted as
+ * `"<METHOD> <path>"`. Map back through the catalog so both land in the same /stats bucket.
+ */
 function routeFromResource(ctx: { paymentPayload: { readonly resource?: { readonly url?: string } } }): string {
   const url = ctx.paymentPayload.resource?.url;
   if (!url) return "unknown";
+  let pathname: string;
   try {
-    return new URL(url).pathname;
+    pathname = new URL(url).pathname;
   } catch {
     return url;
   }
+  return findEndpointByPath(pathname)?.key ?? pathname;
 }

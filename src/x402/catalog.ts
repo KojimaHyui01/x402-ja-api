@@ -438,3 +438,8 @@ export const ENDPOINTS: readonly Endpoint[] = [
 export function findEndpoint(method: string, path: string): Endpoint | undefined {
   return ENDPOINTS.find((e) => e.method === method && e.path === path);
 }
+
+/** Reverse lookup for contexts that only know the URL path (settlement receipts carry no method). */
+export function findEndpointByPath(path: string): Endpoint | undefined {
+  return ENDPOINTS.find((e) => e.path === path);
+}

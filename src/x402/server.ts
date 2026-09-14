@@ -38,7 +38,7 @@ export function buildRoutes(cfg: Config): RoutesConfig {
           price: e.price,
           network: cfg.networkId,
           payTo: cfg.PAY_TO_ADDRESS,
-          maxTimeoutSeconds: 60,
+          maxTimeoutSeconds: 600,
         },
         description: e.description,
         mimeType: "application/json",
